@@ -1,0 +1,21 @@
+BasedOnStyle: LLVM
+
+IndentWidth: 4
+ColumnLimit: 120
+
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortLambdasOnASingleLine: Inline
+
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+BreakBeforeBraces: Attach
+Cpp11BracedListStyle: true
+
+BinPackParameters: false
+BinPackArguments: false
+
+AlignOperands: true
+AlignAfterOpenBracket: Align
+
+AccessModifierOffset: -4

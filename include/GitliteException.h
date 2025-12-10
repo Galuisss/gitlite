@@ -11,7 +11,7 @@ private:
 public:
     GitliteException();
     GitliteException(const std::string& msg);
-    virtual const char* what() const noexcept override;
+    [[nodiscard]] const char* what() const noexcept override;
 };
 
 #endif // GITLITE_EXCEPTION_H

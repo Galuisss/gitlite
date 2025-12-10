@@ -1,9 +1,9 @@
-#include <iostream>
-#include <vector>
-#include <string>
-#include "include/SomeObj.h"
 #include "include/Repository.h"
+#include "include/SomeObj.h"
 #include "include/Utils.h"
+#include <iostream>
+#include <string>
+#include <vector>
 
 void checkCWD() {
     if (!Utils::isDirectory(Repository::getGitliteDir())) {
@@ -28,11 +28,11 @@ int main(int argc, char* argv[]) {
     for (int i = 1; i < argc; ++i) {
         args.push_back(std::string(argv[i]));
     }
-    
+
     checkNoArgs(args);
     SomeObj bloop;
     std::string firstArg = args[0];
-    
+
     if (firstArg == "init") {
         checkArgsNum(args, 1);
         bloop.init();
@@ -121,6 +121,6 @@ int main(int argc, char* argv[]) {
         std::cout << "No command with that name exists." << std::endl;
         return 0;
     }
-    
+
     return 0;
 }

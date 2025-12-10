@@ -1,0 +1,25 @@
+Checks: >
+  -*,
+  bugprone-*,
+  performance-*,
+  modernize-*,
+  readability-*,
+  clang-analyzer-*,
+  -modernize-use-trailing-return-type,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -readability-braces-around-statements,
+  -bugprone-easily-swappable-parameters,
+  -modernize-return-braced-init-list,
+  -readability-function-cognitive-complexity,
+  -modernize-pass-by-value,
+
+WarningsAsErrors: >
+  clang-analyzer-*,
+
+HeaderFilterRegex: 'src/.*|include/.*'
+
+FormatStyle:     file
+CheckOptions:
+  - key:             modernize-use-nullptr.NullMacros
+    value:           'NULL'

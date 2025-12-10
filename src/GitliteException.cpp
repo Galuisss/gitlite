@@ -1,6 +1,6 @@
 #include "../include/GitliteException.h"
 
-GitliteException::GitliteException() : message("") {}
+GitliteException::GitliteException() = default;
 
 GitliteException::GitliteException(const std::string& msg) : message(msg) {}
 
