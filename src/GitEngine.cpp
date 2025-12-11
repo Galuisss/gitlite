@@ -6,5 +6,5 @@ using std::string;
 namespace fs = std::filesystem;
 
 void GitEngine::init() {
-    Repo::init();
+    repo.init();
 }

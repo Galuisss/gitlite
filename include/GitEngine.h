@@ -9,7 +9,7 @@ private:
     Repo repo;
 
 public:
-    static void init();
+    void init();
 
     void addRemote(std::string_view name, std::string_view path);
     void rmRemote(std::string_view name);

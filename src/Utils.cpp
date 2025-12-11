@@ -1,12 +1,15 @@
 #include "Utils.h"
-#include <algorithm>
 #include <cstddef>
-#include <cstdlib>
-#include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <stdexcept>
+#include <cstdlib>
+#include <cstring>
 #include <sys/stat.h>
+
+namespace fs = std::filesystem;
 
 /** Assorted utilities.
  *
@@ -140,157 +143,24 @@ std::string sha1(std::string_view s1, std::string_view s2, std::string_view s3, 
 }
 } // namespace SHA1
 
-/* SHA-1 HASH VALUES. */
-/** Returns the SHA-1 hash of the concatenation of VALS, which may
- *  be any mixture of byte arrays and Strings. */
-std::string Utils::sha1(const std::string& s1) {
-    return SHA1::sha1(s1);
-}
-
-std::string Utils::sha1(const std::string& s1, const std::string& s2) {
-    return SHA1::sha1(s1, s2);
-}
-
-std::string Utils::sha1(const std::string& s1, const std::string& s2, const std::string& s3, const std::string& s4) {
-    return SHA1::sha1(s1, s2, s3, s4);
-}
-
-/** Returns the SHA-1 hash of the concatenation of the strings in VALS. */
-std::string Utils::sha1(const std::vector<unsigned char>& data) {
-    std::string str(data.begin(), data.end());
-    return SHA1::sha1(str);
-}
 
 /* FILE DELETION */
 /** Deletes FILE if it exists and is not a directory.  Returns true
  *  if FILE was deleted, and false otherwise.  Refuses to delete FILE
  *  and throws IllegalArgumentException unless the directory designated by
  *  FILE also contains a directory named .gitlite. */
-bool Utils::restrictedDelete(const std::string& filepath) {
-    // Extract parent directory
-    size_t pos = filepath.find_last_of("/\\");
-    std::string parentDir = (pos == std::string::npos) ? "." : filepath.substr(0, pos);
-    std::string gitliteDir = parentDir + "/.gitlite";
+bool Utils::restrictedDelete(const fs::path& target) {
+    fs::path parent = target.has_parent_path() ? target.parent_path() : fs::path(".");
+    fs::path gitliteDir = parent / ".gitlite";
 
-    if (!isDirectory(gitliteDir)) {
+    if (!fs::is_directory(gitliteDir)) {
         throw std::invalid_argument("not .gitlite working directory");
     }
 
-    if (isFile(filepath)) {
-        return remove(filepath.c_str()) == 0;
+    if (fs::is_regular_file(target)) {
+        return fs::remove(target);
     }
     return false;
-}
-
-/* READING AND WRITING FILE CONTENTS */
-/** Return the entire contents of FILE as a byte array.  FILE must
- *  be a normal file.  Throws IllegalArgumentException
- *  in case of problems. */
-std::vector<unsigned char> Utils::readContents(const std::string& filepath) {
-    if (!isFile(filepath)) {
-        throw std::invalid_argument("must be a normal file");
-    }
-
-    std::ifstream file(filepath, std::ios::binary);
-    if (!file.is_open()) {
-        throw std::invalid_argument("cannot open file");
-    }
-
-    file.seekg(0, std::ios::end);
-    size_t size = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    std::vector<unsigned char> contents(size);
-    file.read(reinterpret_cast<char*>(contents.data()), static_cast<std::streamsize>(size));
-
-    return contents;
-}
-
-/** Return the entire contents of FILE as a String.  FILE must
- *  be a normal file.  Throws IllegalArgumentException
- *  in case of problems. */
-std::string Utils::readContentsAsString(const std::string& filepath) {
-    auto contents = readContents(filepath);
-    return std::string(contents.begin(), contents.end());
-}
-
-/** Write the result of concatenating the bytes in CONTENTS to FILE,
- *  creating or overwriting it as needed.  Each object in CONTENTS may be
- *  either a String or a byte array.  Throws IllegalArgumentException
- *  in case of problems. */
-void Utils::writeContents(const std::string& filepath, const std::string& content) {
-    // Create parent directories if needed
-    size_t pos = filepath.find_last_of("/\\");
-    if (pos != std::string::npos) {
-        std::string parentDir = filepath.substr(0, pos);
-        createDirectories(parentDir);
-    }
-
-    std::ofstream file(filepath, std::ios::binary);
-    if (!file.is_open()) {
-        throw std::invalid_argument("cannot create file");
-    }
-
-    file.write(content.c_str(), static_cast<std::streamsize>(content.size()));
-}
-
-void Utils::writeContents(const std::string& filepath, const std::vector<unsigned char>& content) {
-    // Create parent directories if needed
-    size_t pos = filepath.find_last_of("/\\");
-    if (pos != std::string::npos) {
-        std::string parentDir = filepath.substr(0, pos);
-        createDirectories(parentDir);
-    }
-
-    std::ofstream file(filepath, std::ios::binary);
-    if (!file.is_open()) {
-        throw std::invalid_argument("cannot create file");
-    }
-
-    file.write(reinterpret_cast<const char*>(content.data()), static_cast<std::streamsize>(content.size()));
-}
-
-/** Returns a list of the names of all plain files in the directory DIR, in
- *  order as C++ Strings.  Returns null if DIR does
- *  not denote a directory. */
-std::vector<std::string> Utils::plainFilenamesIn(const std::string& dirPath) {
-    std::vector<std::string> files;
-
-    DIR* dir = opendir(dirPath.c_str());
-    if (dir == nullptr) {
-        return files;
-    }
-
-    struct dirent* entry;
-    while ((entry = readdir(dir)) != nullptr) {
-        if (entry->d_type == DT_REG) { // Regular file
-            files.emplace_back(entry->d_name);
-        }
-    }
-
-    closedir(dir);
-    std::sort(files.begin(), files.end());
-    return files;
-}
-
-/* OTHER FILE UTILITIES */
-
-/** Return the concatenation of FIRST and SECOND into a File path,
- *  handling empty strings and path separators appropriately. */
-std::string Utils::join(const std::string& first, const std::string& second) {
-    if (first.empty())
-        return second;
-    if (second.empty())
-        return first;
-
-    if (first.back() == '/' || first.back() == '\\') {
-        return first + second;
-    }
-    return first + "/" + second;
-}
-
-std::string Utils::join(const std::string& first, const std::string& second, const std::string& third) {
-    return join(join(first, second), third);
 }
 
 /** Print a message composed from MSG and ARGS as for the String.format
@@ -302,48 +172,4 @@ void Utils::message(const std::string& msg) {
 void Utils::exitWithMessage(const std::string& msg) {
     message(msg);
     std::exit(0);
-}
-
-/** Returns true if PATH exists as a file or directory. */
-bool Utils::exists(const std::string& path) {
-    struct stat buffer;
-    return (stat(path.c_str(), &buffer) == 0);
-}
-
-/** Returns true if PATH exists and is a regular file. */
-bool Utils::isFile(const std::string& path) {
-    struct stat buffer;
-    if (stat(path.c_str(), &buffer) != 0) {
-        return false;
-    }
-    return S_ISREG(buffer.st_mode);
-}
-
-/** Returns true if PATH exists and is a directory. */
-bool Utils::isDirectory(const std::string& path) {
-    struct stat buffer;
-    if (stat(path.c_str(), &buffer) != 0) {
-        return false;
-    }
-    return S_ISDIR(buffer.st_mode);
-}
-
-/** Recursively creates all directories in PATH if they don't exist.
- *  Returns true if all directories were created or already exist,
- *  false otherwise. */
-bool Utils::createDirectories(const std::string& path) {
-    if (path.empty())
-        return true;
-    if (isDirectory(path))
-        return true;
-
-    size_t pos = path.find_last_of("/\\");
-    if (pos != std::string::npos) {
-        std::string parent = path.substr(0, pos);
-        if (!createDirectories(parent)) {
-            return false;
-        }
-    }
-
-    return mkdir(path.c_str(), 0755) == 0 || isDirectory(path);
 }

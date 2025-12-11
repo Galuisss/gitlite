@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
 
     if (firstArg == "init") {
         checkArgsNum(args, 1);
-        GitEngine::init();
+        bloop.init();
     } /*
     else if (firstArg == "add-remote") {
         checkCWD();
