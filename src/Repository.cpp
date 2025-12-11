@@ -17,6 +17,7 @@ using std::format;
 using std::optional;
 using std::string;
 using std::string_view;
+using std::vector;
 
 namespace fs = std::filesystem;
 
@@ -25,6 +26,7 @@ const fs::path Repo::objDir = ".gitlite/objects";
 const fs::path Repo::branchDir = ".gitlite/refs/heads";
 const fs::path Repo::headFile = ".gitlite/HEAD";
 const fs::path Repo::commitSetFile = ".gitlite/COMMITS";
+const fs::path Repo::branchSetFile = ".gitlite/BRANCHES";
 
 inline fs::path Repo::id_to_dir(string_view id) {
     return objDir / id.substr(0, 2) / id.substr(2, 38);
@@ -48,6 +50,7 @@ void Repo::add_init_commit() {
     string id = SHA1::sha1(serialize(initial));
     initial.id = id;
     add_commit(initial);
+    allBranches.emplace("master");
     update_branch("master", id);
     update_head("master");
     // headCommitId = id;
@@ -55,6 +58,7 @@ void Repo::add_init_commit() {
     // branches.emplace("master", id);
     allCommits.insert(id);
     persist_commit_set();
+    persist_branch_set();
 }
 
 void Repo::init() {
@@ -101,7 +105,19 @@ void Repo::persist_commit_set() {
     ser::serialize_to_safe_file(allCommits, commitSetFile);
 }
 
-optional<string> Repo::get_id_blob_id(const string& fileName) {
+void Repo::recover_branch_set() {
+    if (fs::exists(branchSetFile)) {
+        ser::deserialize_from_file(allBranches, branchSetFile);
+    } else {
+        allBranches.clear();
+    }
+}
+
+void Repo::persist_branch_set() {
+    ser::serialize_to_safe_file(allBranches, branchSetFile);
+}
+
+optional<string> Repo::get_id_blob_id(con_string fileName) {
     Commit comm;
     ser::deserialize_from_file(comm, id_to_dir(headCommitId));
     auto it = comm.mapping.find(fileName);
@@ -111,7 +127,7 @@ optional<string> Repo::get_id_blob_id(const string& fileName) {
     return std::nullopt;
 }
 
-void Repo::git_add(const string& fileName) {
+void Repo::git_add(con_string fileName) {
     // 获取 headCommitId
     recover_basic_info();
     recover_index();
@@ -149,7 +165,7 @@ void Repo::git_add(const string& fileName) {
     ser::serialize_to_safe_file(stageRemove, gitDir / "INDEX2");
 }
 
-void Repo::git_commit(const string& message) {
+void Repo::git_commit(con_string message) {
     // 错误检查和初始化
     if (message.empty()) {
         Utils::exitWithMessage("Please enter a commit message.");
@@ -195,7 +211,7 @@ void Repo::git_commit(const string& message) {
     persist_commit_set();
 }
 
-void Repo::git_rm(const string& fileName) {
+void Repo::git_rm(con_string fileName) {
     // 获取 headCommitId
     recover_basic_info();
     recover_index();
@@ -238,9 +254,9 @@ void Repo::git_rm(const string& fileName) {
 
 inline void print_commit(const Commit& comm) {
     cout << "===\n";
-    cout << "commit " << comm.id << "\n";
+    cout << format("commit {}\n", comm.id);
     if (comm.parents.size() >= 2) {
-        cout << "Merge: " << comm.parents[0].substr(0, 7) << " " << comm.parents[1].substr(0, 7) << "\n";
+        cout << format("Merge: {} {}\n", comm.parents[0].substr(0, 7), comm.parents[1].substr(0, 7));
     }
     cout << format_time_point(comm.timestamp) << "\n";
     cout << comm.message << "\n\n";
@@ -267,7 +283,7 @@ void Repo::global_log() {
     }
 }
 
-void Repo::find(const string& message) {
+void Repo::find(con_string message) {
     recover_commit_set();
     Commit comm;
     bool non_empty = false;
@@ -278,7 +294,181 @@ void Repo::find(const string& message) {
             cout << comm.id << '\n';
         }
     }
-    if(!non_empty) {
+    if (!non_empty) {
         Utils::exitWithMessage("Found no commit with that message.");
     }
+}
+
+void Repo::checkout_file(con_string fileName) {
+    recover_basic_info();
+    Commit comm;
+    ser::deserialize_from_file(comm, id_to_dir(headCommitId));
+    auto it = comm.mapping.find(fileName);
+    if (it != comm.mapping.end()) {
+        fs::copy_file(id_to_dir(it->second), fileName, fs::copy_options::overwrite_existing);
+    } else {
+        Utils::exitWithMessage("File does not exist in that commit.");
+    }
+}
+
+void Repo::checkout_file_in_commit(con_string commitId, con_string fileName) {
+    recover_commit_set();
+    auto it = allCommits.lower_bound(commitId);
+    if (it == allCommits.end() || it->compare(0, commitId.size(), commitId) != 0) {
+        Utils::exitWithMessage("No commit with that id exists.");
+    }
+
+    Commit comm;
+    ser::deserialize_from_file(comm, id_to_dir(*it));
+    auto it2 = comm.mapping.find(fileName);
+    if (it2 != comm.mapping.end()) {
+        fs::copy_file(id_to_dir(it2->second), fileName, fs::copy_options::overwrite_existing);
+    } else {
+        Utils::exitWithMessage("File does not exist in that commit.");
+    }
+}
+
+void Repo::checkout_branch(con_string branch) {
+    recover_basic_info();
+    // 该分支是当前分支
+    if (branch == headBranch) {
+        Utils::exitWithMessage("No need to checkout the current branch.");
+    }
+
+    recover_branch_set();
+    // 不存在同名分支
+    if (!allBranches.contains(branch)) {
+        Utils::exitWithMessage("No such branch exists.");
+    }
+
+    const fs::path p = ".";
+    Commit src;
+    ser::deserialize_from_file(src, id_to_dir(headCommitId));
+    Commit dst;
+    string id;
+    ser::deserialize_from_file(id, branchDir / branch);
+    ser::deserialize_from_file(dst, id_to_dir(id));
+
+    for (const auto& entry : fs::directory_iterator(p)) {
+        auto name = entry.path().filename().string();
+        if (!src.mapping.contains(name) && dst.mapping.contains(name)) {
+            Utils::exitWithMessage("There is an untracked file in the way; delete it, or add and commit it first.");
+        }
+    }
+
+    // 删除当前提交有但目标提交没有的跟踪文件
+    for (const auto& [name, _] : src.mapping) {
+        if (!dst.mapping.contains(name)) {
+            Utils::restrictedDelete(p / name);
+        }
+    }
+
+    // 将目标提交中的文件写入工作区
+    for (const auto& [name, blobId] : dst.mapping) {
+        fs::copy_file(id_to_dir(blobId), p / name, fs::copy_options::overwrite_existing);
+    }
+
+    // 切换分支并清空暂存区
+    headBranch = branch;
+    headCommitId = id;
+    stageAdd.clear();
+    stageRemove.clear();
+    ser::serialize_to_safe_file(stageAdd, gitDir / "INDEX1");
+    ser::serialize_to_safe_file(stageRemove, gitDir / "INDEX2");
+
+    update_head(branch);
+}
+
+void Repo::status() {
+    recover_basic_info();
+    recover_branch_set();
+    recover_index();
+
+    cout << "=== Branches ===\n";
+    cout << format("*{}\n", headBranch);
+    for (const auto& i : allBranches) {
+        if (i != headBranch) {
+            cout << i << '\n';
+        }
+    }
+    cout << "\n=== Staged Files ===\n";
+    for (const auto& i : stageAdd) {
+        cout << i.first << '\n';
+    }
+    cout << "\n=== Removed Files ===\n";
+    for (const auto& i : stageRemove) {
+        cout << i << '\n';
+    }
+    cout << "\n=== Modifications Not Staged For Commit ===\n";
+    cout << "\n=== Untracked Files ===\n";
+}
+
+void Repo::branch(con_string name) {
+    recover_basic_info();
+    recover_branch_set();
+    if (allBranches.contains(name)) {
+        Utils::exitWithMessage("A branch with that name already exists.");
+    }
+    string id = headCommitId;
+    update_branch(name, id);
+    allBranches.emplace(name);
+    persist_branch_set();
+}
+
+void Repo::rm_branch(con_string name) {
+    recover_basic_info();
+    if (headBranch == name) {
+        Utils::exitWithMessage("Cannot remove the current branch.");
+    }
+
+    recover_branch_set();
+    if (!allBranches.contains(name)) {
+        Utils::exitWithMessage("A branch with that name does not exist.");
+    }
+
+    // 删除分支引用文件（不使用 restrictedDelete，避免路径检查失效）
+    fs::remove(branchDir / name);
+    allBranches.erase(name);
+    persist_branch_set();
+}
+
+void Repo::reset(con_string commitId) {
+    recover_commit_set();
+    if (!allCommits.contains(commitId)) {
+        Utils::exitWithMessage("No commit with that id exists.");
+    }
+    recover_basic_info();
+
+    const fs::path p = ".";
+    Commit src;
+    ser::deserialize_from_file(src, id_to_dir(headCommitId));
+    Commit dst;
+    ser::deserialize_from_file(dst, id_to_dir(commitId));
+
+    for (const auto& entry : fs::directory_iterator(p)) {
+        auto name = entry.path().filename().string();
+        if (!src.mapping.contains(name) && dst.mapping.contains(name)) {
+            Utils::exitWithMessage("There is an untracked file in the way; delete it, or add and commit it first.");
+        }
+    }
+
+    // 删除当前提交有但目标提交没有的跟踪文件
+    for (const auto& [name, _] : src.mapping) {
+        if (!dst.mapping.contains(name)) {
+            Utils::restrictedDelete(p / name);
+        }
+    }
+
+    // 将目标提交中的文件写入工作区
+    for (const auto& [name, blobId] : dst.mapping) {
+        fs::copy_file(id_to_dir(blobId), p / name, fs::copy_options::overwrite_existing);
+    }
+
+    // 切换分支并清空暂存区
+    stageAdd.clear();
+    stageRemove.clear();
+    ser::serialize_to_safe_file(stageAdd, gitDir / "INDEX1");
+    ser::serialize_to_safe_file(stageRemove, gitDir / "INDEX2");
+
+    update_branch(headBranch, commitId);
 }

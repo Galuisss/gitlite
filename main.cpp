@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
         checkCWD();
         checkArgsNum(args, 2);
         bloop.find(args[1]);
-    } /* else if (firstArg == "status") {
+    } else if (firstArg == "status") {
         checkCWD();
         checkArgsNum(args, 1);
         bloop.status();
@@ -111,7 +111,7 @@ int main(int argc, char* argv[]) {
         checkCWD();
         checkArgsNum(args, 2);
         bloop.reset(args[1]);
-    } else if (firstArg == "merge") {
+    } /*else if (firstArg == "merge") {
         checkCWD();
         checkArgsNum(args, 2);
         bloop.merge(args[1]);
