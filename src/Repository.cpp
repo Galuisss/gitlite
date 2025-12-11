@@ -27,11 +27,11 @@ void Repo::add_commit(const Commit& comm) {
     ser::serialize_to_file(comm, id_to_dir(id));
 }
 
-void Repo::add_branch(string_view branch, string_view comm_id) {
+void Repo::update_branch(string_view branch, string_view comm_id) {
     ser::serialize_to_safe_file(comm_id, branchDir / branch);
 }
 
-void Repo::add_head(string_view branch) {
+void Repo::update_head(string_view branch) {
     ser::serialize_to_safe_file(branch, headFile);
 }
 
@@ -40,11 +40,11 @@ void Repo::add_init_commit() {
     string id = SHA1::sha1(serialize(initial));
     initial.id = id;
     add_commit(initial);
-    add_branch("master", id);
-    add_head("master");
-    headCommitId = id;
-    headBranch = "master";
-    branches.emplace("master", id);
+    update_branch("master", id);
+    update_head("master");
+    //headCommitId = id;
+    //headBranch = "master";
+    //branches.emplace("master", id);
 }
 
 void Repo::recover_basic_info() {
@@ -114,6 +114,48 @@ void Repo::git_add(const string& fileName) {
     // 写回文件暂存区
     ser::serialize_to_safe_file(stageAdd, gitDir / "INDEX1");
     ser::serialize_to_safe_file(stageRemove, gitDir / "INDEX2");
+}
+
+void Repo::git_commit(const string& message) {
+    // 错误检查和初始化
+    if (message.empty()) {
+        Utils::exitWithMessage("Please enter a commit message.");
+    }
+    recover_index();
+    if (stageAdd.empty() && stageRemove.empty()) {
+        Utils::exitWithMessage("No changes added to the commit.");
+    }
+    recover_basic_info();
+
+    Commit old_comm;
+    ser::deserialize_from_file(old_comm, id_to_dir(headCommitId));
+
+    // 存入新提交
+    Commit comm(message, std::chrono::system_clock::now());
+    comm.mapping = std::move(old_comm.mapping);
+    comm.parents.emplace_back(old_comm.id);
+
+    for (auto [k, v] : stageAdd) {
+        comm.mapping[k] = std::move(v);
+    }
+    for (const auto& k : stageRemove) {
+        comm.mapping.erase(k);
+    }
+
+    auto id = SHA1::sha1(serialize(comm));
+    comm.id = id;
+    ser::serialize_to_file(comm, id_to_dir(id));
+
+    // 清空暂存区
+    stageAdd.clear();
+    stageRemove.clear();
+
+    ser::serialize_to_safe_file(stageAdd, gitDir / "INDEX1");
+    ser::serialize_to_safe_file(stageRemove, gitDir / "INDEX2");
+
+    // 设置分支位置
+    update_branch(headBranch, id);
+    headCommitId = id;
 }
 
 void Repo::init() {

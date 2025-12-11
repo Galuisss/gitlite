@@ -56,12 +56,13 @@ int main(int argc, char* argv[]) {
         checkArgsNum(args, 2);
         bloop.add(args[1]);
     }
-    /*
+
     else if (firstArg == "commit") {
         checkCWD();
-        checkArgsNum(args, 2);a
+        checkArgsNum(args, 2);
         bloop.commit(args[1]);
-    } else if (firstArg == "rm") {
+
+    } /*else if (firstArg == "rm") {
         checkCWD();
         checkArgsNum(args, 2);
         bloop.rm(args[1]);

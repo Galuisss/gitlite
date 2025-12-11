@@ -9,13 +9,13 @@ private:
     Repo repo;
 
 public:
-    void init();
+    static void init();
 
     void addRemote(std::string_view name, std::string_view path);
     void rmRemote(std::string_view name);
 
     void add(const std::string& filename);
-    void commit(std::string_view message);
+    void commit(const std::string& message);
     void rm(std::string_view filename);
 
     void log();

@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <set>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -79,7 +80,7 @@ template <typename K, typename V>
 void serialize(const std::map<K, V>& obj, std::ostream& out) {
     size_t len = obj.size();
     serialize(len, out);
-    for (auto [k, v] : obj) {
+    for (const auto& [k, v] : obj) {
         serialize(k, out);
         serialize(v, out);
     }
@@ -112,7 +113,7 @@ template <typename K, typename V>
     std::string all;
     size_t len = obj.size();
     all.append(serialize(len));
-    for (auto [k, v] : obj) {
+    for (const auto& [k, v] : obj) {
         all.append(serialize(k));
         all.append(serialize(v));
     }
@@ -125,7 +126,7 @@ template <typename T>
 void serialize(const std::vector<T>& obj, std::ostream& out) {
     size_t len = obj.size();
     serialize(len, out);
-    for (auto i : obj) {
+    for (const auto& i : obj) {
         serialize(i, out);
     }
 }
@@ -150,7 +151,43 @@ template <typename T>
     std::string all;
     size_t len = obj.size();
     all.append(serialize(len));
-    for (auto i : obj) {
+    for (const auto& i : obj) {
+        all.append(serialize(i));
+    }
+    return all;
+}
+
+// set
+template <typename T>
+    requires requires(T x) { serialize(x, std::declval<std::ostream&>()); }
+void serialize(const std::set<T>& obj, std::ostream& out) {
+    size_t len = obj.size();
+    serialize(len, out);
+    for (const auto& i : obj) {
+        serialize(i, out);
+    }
+}
+
+template <typename T>
+    requires requires(T x) { deserialize(x, std::declval<std::istream&>()); }
+void deserialize(std::set<T>& obj, std::istream& in) {
+    size_t len;
+    deserialize(len, in);
+    obj.clear();
+    for (size_t i = 0; i < len; ++i) {
+        T t;
+        deserialize(t, in);
+        obj.insert(std::move(t));
+    }
+}
+
+template <typename T>
+    requires requires(T x) { serialize(x); }
+[[nodiscard]] std::string serialize(const std::set<T>& obj) {
+    std::string all;
+    size_t len = obj.size();
+    all.append(serialize(len));
+    for (const auto& i : obj) {
         all.append(serialize(i));
     }
     return all;
