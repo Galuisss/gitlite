@@ -43,6 +43,7 @@ public:
     static void init(); // 初始化仓库
     void git_add(const string& fileName);
     void git_commit(const string& message);
+    void git_rm(const string& fileName);
 };
 
 #endif // REPOSITORY_H

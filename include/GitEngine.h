@@ -2,39 +2,40 @@
 #define GITENGINE_H
 
 #include "Repository.h"
-#include <string_view>
 
 class GitEngine {
+    using con_string = const std::string&;
+
 private:
     Repo repo;
 
 public:
     static void init();
 
-    void addRemote(std::string_view name, std::string_view path);
-    void rmRemote(std::string_view name);
+    void addRemote(con_string name, con_string path);
+    void rmRemote(con_string name);
 
-    void add(const std::string& filename);
-    void commit(const std::string& message);
-    void rm(std::string_view filename);
+    void add(con_string filename);
+    void commit(con_string message);
+    void rm(con_string filename);
 
     void log();
     void globalLog();
-    void find(std::string_view message);
+    void find(con_string message);
     void status();
 
-    void checkoutBranch(std::string_view branch);
-    void checkoutFile(std::string_view filename);
-    void checkoutFileInCommit(std::string_view commitId, std::string_view filename);
+    void checkoutBranch(con_string branch);
+    void checkoutFile(con_string filename);
+    void checkoutFileInCommit(con_string commitId, con_string filename);
 
-    void branch(std::string_view name);
-    void rmBranch(std::string_view name);
-    void reset(std::string_view commitId);
-    void merge(std::string_view branch);
+    void branch(con_string name);
+    void rmBranch(con_string name);
+    void reset(con_string commitId);
+    void merge(con_string branch);
 
-    void push(std::string_view remoteName, std::string_view remoteBranch);
-    void fetch(std::string_view remoteName, std::string_view remoteBranch);
-    void pull(std::string_view remoteName, std::string_view remoteBranch);
+    void push(con_string remoteName, con_string remoteBranch);
+    void fetch(con_string remoteName, con_string remoteBranch);
+    void pull(con_string remoteName, con_string remoteBranch);
 };
 
 #endif // GITENGINE_H

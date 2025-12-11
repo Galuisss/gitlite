@@ -42,9 +42,9 @@ void Repo::add_init_commit() {
     add_commit(initial);
     update_branch("master", id);
     update_head("master");
-    //headCommitId = id;
-    //headBranch = "master";
-    //branches.emplace("master", id);
+    // headCommitId = id;
+    // headBranch = "master";
+    // branches.emplace("master", id);
 }
 
 void Repo::recover_basic_info() {
@@ -156,6 +156,38 @@ void Repo::git_commit(const string& message) {
     // 设置分支位置
     update_branch(headBranch, id);
     headCommitId = id;
+}
+
+void Repo::git_rm(const string& fileName) {
+    // 获取 headCommitId
+    recover_basic_info();
+    recover_index();
+
+    bool reason = false;
+
+    // 删除文件
+    if (stageAdd.erase(fileName) != 0) {
+        reason = true;
+    };
+
+    // 获取当前 commit 中的哈希并比较
+    Commit comm;
+    string id_in_commit;
+    ser::deserialize_from_file(comm, id_to_dir(headCommitId));
+    auto it = comm.mapping.find(fileName);
+    if (it != comm.mapping.end()) {
+        reason = true;
+        stageRemove.emplace(fileName);
+        Utils::restrictedDelete(fileName);
+    }
+
+    if (!reason) {
+        Utils::exitWithMessage("No reason to remove the file.");
+    }
+
+    // 写回文件暂存区
+    ser::serialize_to_safe_file(stageAdd, gitDir / "INDEX1");
+    ser::serialize_to_safe_file(stageRemove, gitDir / "INDEX2");
 }
 
 void Repo::init() {
