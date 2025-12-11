@@ -10,7 +10,7 @@ private:
     Repo repo;
 
 public:
-    static void init();
+    void init();
 
     void addRemote(con_string name, con_string path);
     void rmRemote(con_string name);

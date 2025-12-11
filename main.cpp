@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
 
     if (firstArg == "init") {
         checkArgsNum(args, 1);
-        GitEngine::init();
+        bloop.init();
     } /*
     else if (firstArg == "add-remote") {
         checkCWD();
@@ -66,7 +66,7 @@ int main(int argc, char* argv[]) {
         checkCWD();
         checkArgsNum(args, 2);
         bloop.rm(args[1]);
-    } /*else if (firstArg == "log") {
+    } else if (firstArg == "log") {
         checkCWD();
         checkArgsNum(args, 1);
         bloop.log();
@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
         checkCWD();
         checkArgsNum(args, 2);
         bloop.find(args[1]);
-    } else if (firstArg == "status") {
+    } /* else if (firstArg == "status") {
         checkCWD();
         checkArgsNum(args, 1);
         bloop.status();
