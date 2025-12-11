@@ -59,3 +59,7 @@ void GitEngine::rmBranch(con_string name) {
 void GitEngine::reset(con_string commitId) {
     repo.reset(commitId);
 }
+
+void GitEngine::merge(con_string branch) {
+    repo.merge(branch);
+}

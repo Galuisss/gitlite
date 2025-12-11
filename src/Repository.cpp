@@ -3,8 +3,10 @@
 #include <format>
 #include <iostream>
 #include <optional>
+#include <queue>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "Commit.hpp"
@@ -185,7 +187,7 @@ void Repo::git_commit(con_string message) {
     comm.mapping = std::move(old_comm.mapping);
     comm.parents.emplace_back(old_comm.id);
 
-    for (auto [k, v] : stageAdd) {
+    for (auto&& [k, v] : stageAdd) {
         comm.mapping[k] = std::move(v);
     }
     for (const auto& k : stageRemove) {
@@ -471,4 +473,239 @@ void Repo::reset(con_string commitId) {
     ser::serialize_to_safe_file(stageRemove, gitDir / "INDEX2");
 
     update_branch(headBranch, commitId);
+}
+
+[[nodiscard]] Commit Repo::merge_base(Commit A, Commit B) {
+    std::queue<Commit> q1;
+    std::queue<Commit> q2;
+    q1.push(std::move(A));
+    q2.push(std::move(B));
+
+    std::unordered_map<string, int> color;
+    Commit ans;
+    bool flag = true;
+    while (flag) {
+        size_t s1 = q1.size();
+        for (int i = 0; i < s1 && flag; ++i) {
+            auto f = q1.front();
+            q1.pop();
+            auto it = color.find(f.id);
+            if (it != color.end() && it->second == 2) {
+                ans = f;
+                flag = false;
+                break;
+            };
+            color[f.id] = 1;
+            for (const auto& p : f.parents) {
+                Commit parent;
+                ser::deserialize_from_file(parent, id_to_dir(p));
+                q1.push(std::move(parent));
+            }
+        }
+        size_t s2 = q2.size();
+        for (int i = 0; i < s2 && flag; ++i) {
+            auto f = q2.front();
+            q2.pop();
+            auto it = color.find(f.id);
+            if (it != color.end() && it->second == 1) {
+                ans = f;
+                flag = false;
+                break;
+            };
+            color[f.id] = 2;
+            for (const auto& p : f.parents) {
+                Commit parent;
+                ser::deserialize_from_file(parent, id_to_dir(p));
+                q2.push(std::move(parent));
+            }
+        }
+    }
+    return ans;
+}
+
+void Repo::merge(con_string branch) {
+    if (!fs::exists(branchDir / branch)) {
+        Utils::exitWithMessage("A branch with that name does not exist.");
+    }
+    recover_basic_info();
+    if (branch == headBranch) {
+        Utils::exitWithMessage("Cannot merge a branch with itself.");
+    }
+    recover_index();
+    if (!stageAdd.empty() || !stageRemove.empty()) {
+        Utils::exitWithMessage("You have uncommitted changes.");
+    }
+    string commit_a = headCommitId;
+    string commit_b;
+    ser::deserialize_from_file(commit_b, branchDir / branch);
+    Commit A;
+    Commit B;
+    ser::deserialize_from_file(A, id_to_dir(commit_a));
+    ser::deserialize_from_file(B, id_to_dir(commit_b));
+
+    Commit base = merge_base(A, B);
+    string base_id = base.id;
+    if (base_id == commit_a) {
+        reset(commit_b);
+        Utils::exitWithMessage("Current branch fast-forwarded.");
+    }
+    if (base_id == commit_b) {
+        Utils::exitWithMessage("Given branch is an ancestor of the current branch.");
+    }
+
+    auto& map_a = A.mapping;
+    auto& map_b = B.mapping;
+    auto& map_c = base.mapping;
+    bool conflict = false;
+    for (const auto& [k, vbase] : map_c) {
+        auto itA = map_a.find(k);
+        auto itB = map_b.find(k);
+        bool deletedA = itA == map_a.end();
+        bool changedA = deletedA || itA->second != vbase;
+        bool deletedB = itB == map_b.end();
+        bool changedB = deletedB || itB->second != vbase;
+        // 1+6. 在给定分支中变动，本地没变动，听对方的！
+        if (changedB && !changedA) {
+            // 未跟踪覆盖检查
+            if (fs::exists(k) && !map_a.contains(k)) {
+                Utils::exitWithMessage("There is an untracked file in the way; delete it, or add and commit it first.");
+            }
+            // 6. 给定分支删除
+            if (deletedB) {
+                Utils::restrictedDelete(k);
+                stageRemove.insert(k);
+            }
+            // 1. 给定分支修改（非删除）
+            else {
+                fs::copy_file(id_to_dir(itB->second), k, fs::copy_options::overwrite_existing);
+                stageAdd[k] = itB->second;
+            }
+        }
+        // 2+3+7. 本地变动，对方不变动或者变动一致，听本地的！
+        // 2. 在当前分支中已修改，对方未修改 / 3. 两者改动方式相同 / 7. 当前分支中已删除，对方未修改
+        else if (changedA && !changedB || (changedA && changedB && (deletedA || itA->second == itB->second))) {
+            continue;
+        }
+        // 情况 8 的一种: 变动方式不同
+        else if (changedA && changedB) {
+            // 未跟踪覆盖检查
+            if (!map_a.contains(k) && fs::exists(k) && !stageAdd.contains(k) && !stageRemove.contains(k)) {
+                Utils::exitWithMessage("There is an untracked file in the way; delete it, or add and commit it first.");
+            }
+            conflict = true;
+            string all = "<<<<<<< HEAD\n";
+            if (!deletedA) {
+                string contentA;
+                Utils::readContentsAsString(contentA, id_to_dir(itA->second));
+                while (!contentA.empty() && (contentA.back() == '\n' || contentA.back() == '\r')) {
+                    contentA.pop_back();
+                }
+                all.append(contentA);
+            }
+            all.append("\n=======\n");
+            if (!deletedB) {
+                string contentB;
+                Utils::readContentsAsString(contentB, id_to_dir(itB->second));
+                while (!contentB.empty() && (contentB.back() == '\n' || contentB.back() == '\r')) {
+                    contentB.pop_back();
+                }
+                all.append(contentB);
+            }
+            if (!deletedB) {
+                all.append("\n>>>>>>>\n");
+            } else {
+                all.append(">>>>>>>\n");
+            }
+            Utils::writeContents_safe(all, k);
+            string blobId = SHA1::sha1(all);
+            Utils::writeContents(all, id_to_dir(blobId));
+            stageAdd[k] = blobId;
+            stageRemove.erase(k);
+        }
+    }
+
+    // 情况 5
+    for (const auto& [k, blobB] : map_b) {
+        if (map_c.contains(k) || map_a.contains(k))
+            continue;
+
+        // 未跟踪覆盖检查
+        fs::path path = k;
+        if (fs::exists(path) && !stageAdd.contains(k) && !stageRemove.contains(k) && !map_a.contains(k)) {
+            Utils::exitWithMessage("There is an untracked file in the way; delete it, or add and commit it first.");
+        }
+
+        // 取目标版本并暂存
+        fs::copy_file(id_to_dir(blobB), path, fs::copy_options::overwrite_existing);
+        stageAdd[k] = blobB;
+    }
+
+    // 情况 8 的第二种：分割点都没有，现在都有且不同
+    for (const auto& [k, blobA] : map_a) {
+        if (map_c.contains(k) || !map_b.contains(k))
+            continue;
+        if (blobA == map_b.find(k)->second)
+            continue;
+        conflict = true;
+        string all = "<<<<<<< HEAD\n";
+        string contentA;
+        Utils::readContentsAsString(contentA, id_to_dir(blobA));
+        while (!contentA.empty() && (contentA.back() == '\n' || contentA.back() == '\r')) {
+            contentA.pop_back();
+        }
+        all.append(contentA);
+        all.append("\n=======\n");
+        string contentB;
+        Utils::readContentsAsString(contentB, id_to_dir(map_b.find(k)->second));
+        while (!contentB.empty() && (contentB.back() == '\n' || contentB.back() == '\r')) {
+            contentB.pop_back();
+        }
+        all.append(contentB);
+        if (!contentB.empty()) {
+            all.append("\n>>>>>>>\n");
+        } else {
+            all.append(">>>>>>>\n");
+        }
+        Utils::writeContents_safe(all, k);
+        string blobId = SHA1::sha1(all);
+        Utils::writeContents(all, id_to_dir(blobId));
+        stageAdd[k] = blobId;
+        stageRemove.erase(k);
+    }
+
+    // 写回暂存区
+    ser::serialize_to_safe_file(stageAdd, gitDir / "INDEX1");
+    ser::serialize_to_safe_file(stageRemove, gitDir / "INDEX2");
+
+    Commit comm(format("Merged {} into {}.", branch, headBranch), std::chrono::system_clock::now());
+    comm.parents.emplace_back(A.id);
+    comm.parents.emplace_back(B.id);
+    comm.mapping = map_a;
+    for (auto&& [k, v] : stageAdd) {
+        comm.mapping[k] = std::move(v);
+    }
+    for (const auto& k : stageRemove) {
+        comm.mapping.erase(k);
+    }
+
+    auto id = SHA1::sha1(serialize(comm));
+    comm.id = id;
+    ser::serialize_to_file(comm, id_to_dir(id));
+
+    allCommits.insert(id);
+
+    // 清空暂存区
+    stageAdd.clear();
+    stageRemove.clear();
+    ser::serialize_to_safe_file(stageAdd, gitDir / "INDEX1");
+    ser::serialize_to_safe_file(stageRemove, gitDir / "INDEX2");
+
+    // 设置分支位置
+    update_branch(headBranch, id);
+    headCommitId = id;
+    persist_commit_set();
+
+    if (conflict) {
+        Utils::message("Encountered a merge conflict.");
+    }
 }

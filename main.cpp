@@ -111,11 +111,11 @@ int main(int argc, char* argv[]) {
         checkCWD();
         checkArgsNum(args, 2);
         bloop.reset(args[1]);
-    } /*else if (firstArg == "merge") {
+    } else if (firstArg == "merge") {
         checkCWD();
         checkArgsNum(args, 2);
         bloop.merge(args[1]);
-    } else if (firstArg == "push") {
+    } /*else if (firstArg == "push") {
         checkCWD();
         checkArgsNum(args, 3);
         bloop.push(args[1], args[2]);

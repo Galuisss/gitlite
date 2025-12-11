@@ -46,6 +46,8 @@ private:
     void recover_branch_set();
     void persist_branch_set();
 
+    static Commit merge_base(Commit A, Commit B);
+
     std::optional<string> get_id_blob_id(const string& fileName);
 
 public:
@@ -63,6 +65,7 @@ public:
     void branch(con_string name);
     void rm_branch(con_string name);
     void reset(con_string commitId);
+    void merge(con_string branch);
 };
 
 #endif // REPOSITORY_H
