@@ -1,12 +1,12 @@
 #include "Utils.h"
 #include <cstddef>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
-#include <cstdlib>
-#include <cstring>
 #include <sys/stat.h>
 
 namespace fs = std::filesystem;
@@ -143,7 +143,6 @@ std::string sha1(std::string_view s1, std::string_view s2, std::string_view s3, 
 }
 } // namespace SHA1
 
-
 /* FILE DELETION */
 /** Deletes FILE if it exists and is not a directory.  Returns true
  *  if FILE was deleted, and false otherwise.  Refuses to delete FILE
@@ -161,6 +160,53 @@ bool Utils::restrictedDelete(const fs::path& target) {
         return fs::remove(target);
     }
     return false;
+}
+
+/** Return the entire contents of FILE as a String.  FILE must
+ *  be a normal file.  Throws IllegalArgumentException
+ *  in case of problems. */
+void Utils::readContentsAsString(std::string& content, const std::filesystem::path& filepath) {
+    if (!fs::is_regular_file(filepath)) {
+        throw std::invalid_argument("must be a normal file");
+    }
+
+    std::ifstream file(filepath, std::ios::binary);
+    if (!file.is_open()) {
+        throw std::invalid_argument("cannot open file");
+    }
+
+    file.seekg(0, std::ios::end);
+    size_t size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    content.resize(size);
+    file.read(reinterpret_cast<char*>(content.data()), static_cast<std::streamsize>(size));
+}
+
+/** Write the result of concatenating the bytes in CONTENTS to FILE,
+ *  creating or overwriting it as needed.  Each object in CONTENTS may be
+ *  either a String or a byte array.  Throws IllegalArgumentException
+ *  in case of problems. */
+void Utils::writeContents(const std::string& content, const std::filesystem::path& filePath) {
+    // Create parent directories if needed
+    auto parent = filePath.parent_path();
+    std::filesystem::create_directories(parent);
+
+    std::ofstream file(filePath, std::ios::binary);
+    if (!file.is_open()) {
+        throw std::invalid_argument("cannot open file");
+    }
+
+    file.write(content.c_str(), static_cast<std::streamsize>(content.size()));
+}
+
+void Utils::writeContents_safe(const std::string& content, const std::filesystem::path& filePath) {
+    std::ofstream file(filePath, std::ios::binary);
+    if (!file.is_open()) {
+        throw std::invalid_argument("cannot open file");
+    }
+
+    file.write(content.c_str(), static_cast<std::streamsize>(content.size()));
 }
 
 /** Print a message composed from MSG and ARGS as for the String.format

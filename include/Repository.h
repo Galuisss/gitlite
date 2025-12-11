@@ -3,28 +3,44 @@
 
 #include <filesystem>
 #include <map>
+#include <optional>
+#include <string>
 #include <string_view>
 
 #include "Commit.hpp"
 class Repo {
+    using path = std::filesystem::path;
+    using string = std::string;
+    using string_view = std::string_view;
+
 private:
-    static const std::filesystem::path gitDir;
-    static const std::filesystem::path objDir;
-    static const std::filesystem::path branchDir;
-    static const std::filesystem::path headFile;
+    static const path gitDir;
+    static const path objDir;
+    static const path branchDir;
+    static const path headFile;
+    static const path indexFile;
 
-    std::string headCommitId;                    // 缓存当前 HEAD 提交的 Commit ID
-    std::string headBranch;                      // 当前所在的分支名, 不延迟写回
-    std::map<std::string, std::string> branches; // 缓存 refs/heads 的内容, 不延迟写回
+    string headCommitId;                  // 当前 HEAD 提交的 Commit ID
+    string headBranch;                    // 当前所在的分支名
+    std::map<string, string> branches;    // refs/heads 的内容
+    std::map<string, string> stageAdd;    // 暂存区待添加的内容
+    std::map<string, string> stageRemove; // 暂存区待删除的内容
 
-    static void add_commit(const Commit& comm); // 向 objects 加入提交
-    static void add_branch(std::string_view branch, std::string_view comm_id); // 向 refs/heads 加入分支
-    static void add_head(std::string_view branch);
+    static path id_to_dir(string_view id);
+    static void add_commit(const Commit& comm);                      // 向 objects 加入提交
+    static void add_branch(string_view branch, string_view comm_id); // 向 refs/heads 加入分支
+    static void add_head(string_view branch);
 
     void add_init_commit(); // 向 objects 加入初始提交
 
+    void recover_basic_info();
+    void recover_index();
+
+    std::optional<string> get_id_blob_id(const string& fileName);
+
 public:
     void init(); // 初始化仓库
+    void git_add(const string& fileName);
 };
 
 #endif // REPOSITORY_H

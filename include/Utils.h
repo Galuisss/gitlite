@@ -3,9 +3,9 @@
 
 #include <cstdint>
 #include <dirent.h>
+#include <filesystem>
 #include <string>
 #include <string_view>
-#include <filesystem>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
@@ -41,6 +41,9 @@ public:
 
     // File operations
     static bool restrictedDelete(const std::filesystem::path& target);
+    static void readContentsAsString(std::string& content, const std::filesystem::path& filepath);
+    static void writeContents(const std::string& content, const std::filesystem::path& filePath);
+    static void writeContents_safe(const std::string& content, const std::filesystem::path& filePath);
 
     // Message and error reporting
     static void message(const std::string& msg);

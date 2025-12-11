@@ -49,13 +49,17 @@ int main(int argc, char* argv[]) {
         checkCWD();
         checkArgsNum(args, 2);
         bloop.rmRemote(args[1]);
-    } else if (firstArg == "add") {
+
+    }  */
+    else if (firstArg == "add") {
         checkCWD();
         checkArgsNum(args, 2);
         bloop.add(args[1]);
-    } else if (firstArg == "commit") {
+    }
+    /*
+    else if (firstArg == "commit") {
         checkCWD();
-        checkArgsNum(args, 2);
+        checkArgsNum(args, 2);a
         bloop.commit(args[1]);
     } else if (firstArg == "rm") {
         checkCWD();

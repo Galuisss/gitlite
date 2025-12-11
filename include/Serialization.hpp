@@ -182,8 +182,8 @@ void serialize_to_safe_file(const T& obj, const std::filesystem::path& target) {
 
 template <typename T>
     requires requires(T x) { deserialize(x, std::declval<std::istream&>()); }
-void deserialize_from_file(const T& obj, const std::filesystem::path& target) {
-    std::ofstream file(target, std::ios::binary);
+void deserialize_from_file(T& obj, const std::filesystem::path& target) {
+    std::ifstream file(target, std::ios::binary);
     if (!file.is_open()) {
         throw std::invalid_argument("cannot open file");
     }
