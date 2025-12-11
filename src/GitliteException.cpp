@@ -1,4 +1,4 @@
-#include "../include/GitliteException.h"
+#include "GitliteException.h"
 
 GitliteException::GitliteException() = default;
 

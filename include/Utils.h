@@ -1,14 +1,10 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <algorithm>
 #include <cstdint>
 #include <dirent.h>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <sstream>
 #include <string>
+#include <string_view>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
@@ -34,8 +30,8 @@ public:
 };
 extern SHA sha;
 std::string sha1(std::string message);
-std::string sha1(std::string s1, std::string s2);
-std::string sha1(std::string s1, std::string s2, std::string s3, std::string s4);
+std::string sha1(std::string_view s1, std::string_view s2);
+std::string sha1(std::string_view s1, std::string_view s2, std::string_view s3, std::string_view s4);
 } // namespace SHA1
 
 class Utils {
@@ -59,9 +55,6 @@ public:
     static std::vector<std::string> plainFilenamesIn(const std::string& dirPath);
     static std::string join(const std::string& first, const std::string& second);
     static std::string join(const std::string& first, const std::string& second, const std::string& third);
-
-    // Serialization (simplified for basic types)
-    static std::vector<unsigned char> serialize(const std::string& obj);
 
     // Message and error reporting
     static void message(const std::string& msg);

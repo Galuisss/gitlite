@@ -1,42 +1,47 @@
-#include "include/Repository.h"
-#include "include/SomeObj.h"
-#include "include/Utils.h"
+#include "GitEngine.h"
+#include "Utils.h"
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
 
-void checkCWD() {
-    if (!Utils::isDirectory(Repository::getGitliteDir())) {
+using std::string;
+using std::vector;
+namespace fs = std::filesystem;
+
+inline void checkCWD() {
+    if (!fs::is_directory(fs::path(".gitlite"))) {
         Utils::exitWithMessage("Not in an initialized Gitlite directory.");
     }
 }
 
-void checkNoArgs(const std::vector<std::string>& args) {
+inline void checkNoArgs(const vector<string>& args) {
     if (args.empty()) {
         Utils::exitWithMessage("Please enter a command.");
     }
 }
 
-void checkArgsNum(const std::vector<std::string>& args, int n) {
+inline void checkArgsNum(const vector<string>& args, int n) {
     if (static_cast<int>(args.size()) != n) {
         Utils::exitWithMessage("Incorrect operands.");
     }
 }
 
 int main(int argc, char* argv[]) {
-    std::vector<std::string> args;
+    vector<string> args;
     for (int i = 1; i < argc; ++i) {
-        args.push_back(std::string(argv[i]));
+        args.emplace_back(argv[i]);
     }
 
     checkNoArgs(args);
-    SomeObj bloop;
-    std::string firstArg = args[0];
+    GitEngine bloop;
+    string firstArg = args[0];
 
     if (firstArg == "init") {
         checkArgsNum(args, 1);
-        bloop.init();
-    } else if (firstArg == "add-remote") {
+        GitEngine::init();
+    } /*
+    else if (firstArg == "add-remote") {
         checkCWD();
         checkArgsNum(args, 3);
         bloop.addRemote(args[1], args[2]);
@@ -117,7 +122,8 @@ int main(int argc, char* argv[]) {
         checkCWD();
         checkArgsNum(args, 3);
         bloop.pull(args[1], args[2]);
-    } else {
+    } */
+    else {
         std::cout << "No command with that name exists." << std::endl;
         return 0;
     }

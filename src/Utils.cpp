@@ -1,7 +1,10 @@
-#include "../include/Utils.h"
+#include "Utils.h"
+#include <algorithm>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <sys/stat.h>
 
@@ -261,7 +264,7 @@ std::vector<std::string> Utils::plainFilenamesIn(const std::string& dirPath) {
     struct dirent* entry;
     while ((entry = readdir(dir)) != nullptr) {
         if (entry->d_type == DT_REG) { // Regular file
-            files.push_back(std::string(entry->d_name));
+            files.emplace_back(entry->d_name);
         }
     }
 
@@ -288,11 +291,6 @@ std::string Utils::join(const std::string& first, const std::string& second) {
 
 std::string Utils::join(const std::string& first, const std::string& second, const std::string& third) {
     return join(join(first, second), third);
-}
-
-/** Returns a byte array containing the serialized contents of OBJ. */
-std::vector<unsigned char> Utils::serialize(const std::string& obj) {
-    return std::vector<unsigned char>(obj.begin(), obj.end());
 }
 
 /** Print a message composed from MSG and ARGS as for the String.format
